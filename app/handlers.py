@@ -77,9 +77,8 @@ async def get_length(message: Message, state: FSMContext):
     )
     await state.set_state(Form.confirm)
 
-
-@router.callback_query(Form.confirm)
-async def confirm_save(call: types.CallbackQuery, state: FSMContext):
+    # @router.callback_query(Form.confirm)
+    # async def confirm_save(call: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
     if call.data == "yes":
         save_password_to_json(data["website"], data["email"], data["password"])
@@ -89,6 +88,32 @@ async def confirm_save(call: types.CallbackQuery, state: FSMContext):
         await call.message.answer_document(
             file, caption="📁 Fichier passwords.json mis à jour."
         )
+    else:
+        await call.message.answer("❌ Mot de passe non enregistré.")
+    await state.clear()
+    await call.message.answer("Pour recommencer, tapez /start.")
+
+
+from aiogram.types import FSInputFile
+
+
+@router.callback_query(Form.confirm)
+async def confirm_save(call: types.CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    if call.data == "yes":
+        save_password_to_json(data["website"], data["email"], data["password"])
+        await call.message.answer("💾 Mot de passe enregistré dans passwords.json !")
+        # Envoi du fichier passwords.json **directement à l'utilisateur**
+        user_id = call.from_user.id
+        file = FSInputFile(path="passwords.json")
+        try:
+            await call.bot.send_document(
+                chat_id=user_id,
+                document=file,
+                caption="📁 Voici ton fichier passwords.json à jour !",
+            )
+        except Exception as e:
+            await call.message.answer(f"❗️Erreur lors de l'envoi du fichier : {e}")
     else:
         await call.message.answer("❌ Mot de passe non enregistré.")
     await state.clear()
