@@ -120,6 +120,19 @@ async def confirm_save(call: types.CallbackQuery, state: FSMContext):
     await call.message.answer("Pour recommencer, tapez /start.")
 
 
+@router.message(F.text == "/getjson")
+async def getjson(message: Message):
+    user_id = message.from_user.id
+    filename = f"passwords_{user_id}.json"
+    if os.path.exists(filename):
+        file = FSInputFile(path=filename)
+        await message.answer_document(
+            file, caption="📁 Voici TON fichier passwords.json"
+        )
+    else:
+        await message.answer("Tu n'as pas encore de mots de passe enregistrés.")
+
+
 @router.message()
 async def fallback(message: Message):
     await message.answer("Envoyez /start pour commencer à générer un mot de passe.")
