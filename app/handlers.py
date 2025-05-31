@@ -2,13 +2,13 @@ from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import Message, FSInputFile
-
 from app.password_utils import (
     generate_robust_password,
     save_password_to_json,
-    get_passwords_json_bytes,
+    get_passwords_filename,
 )
 from app.keyboards import confirm_keyboard
+import os
 
 router = Router()
 
@@ -41,7 +41,7 @@ async def get_website(message: Message, state: FSMContext):
 @router.message(Form.email)
 async def get_email(message: Message, state: FSMContext):
     if not message.text.strip():
-        await message.answer("❗️Merci de renseigner un email/non vide.")
+        await message.answer("❗️Merci de renseigner un email non vide.")
         return
     await state.update_data(email=message.text.strip())
     await message.answer(
@@ -53,19 +53,10 @@ async def get_email(message: Message, state: FSMContext):
 @router.message(Form.length)
 async def get_length(message: Message, state: FSMContext):
     txt = message.text.strip()
-    if not txt:
-        length = 16
-    else:
-        try:
-            length = int(txt)
-            if length < 4:
-                await message.answer("❗️Longueur minimale 4.")
-                return
-        except ValueError:
-            await message.answer(
-                "❗️Veuillez entrer un nombre ou laissez vide pour la valeur par défaut."
-            )
-            return
+    length = 16 if not txt else int(txt)
+    if length < 4:
+        await message.answer("❗️Longueur minimale 4.")
+        return
     await state.update_data(length=length)
     data = await state.get_data()
     pwd = generate_robust_password(length)
@@ -84,39 +75,35 @@ async def confirm_save(call: types.CallbackQuery, state: FSMContext):
     user_id = call.from_user.id
     if call.data == "yes":
         save_password_to_json(data["website"], data["email"], data["password"], user_id)
-        await call.message.answer(
-            "💾 Mot de passe enregistré dans ton fichier personnel !"
-        )
-        # Envoi du fichier passwords_<user_id>.json à l'utilisateur
-        filename = f"passwords_{user_id}.json"
+        await call.message.answer("💾 Mot de passe enregistré !")
+        filename = get_passwords_filename(user_id)
         file = FSInputFile(path=filename)
-        try:
-            await call.bot.send_document(
-                chat_id=user_id,
-                document=file,
-                caption="📁 Voici TON fichier passwords.json à jour !",
-            )
-        except Exception as e:
-            await call.message.answer(f"❗️Erreur lors de l'envoi du fichier : {e}")
+        await call.bot.send_document(
+            chat_id=user_id,
+            document=file,
+            caption="📁 Voici TON fichier de mots de passe !",
+        )
     else:
         await call.message.answer("❌ Mot de passe non enregistré.")
     await state.clear()
     await call.message.answer("Pour recommencer, tapez /start.")
 
 
-@router.message(F.text == "/getjson")
-async def getjson(message: Message):
+@router.message(F.text == "/passwords")
+async def send_passwords(message: Message):
     user_id = message.from_user.id
-    filename = f"passwords_{user_id}.json"
+    filename = get_passwords_filename(user_id)
     if os.path.exists(filename):
         file = FSInputFile(path=filename)
         await message.answer_document(
-            file, caption="📁 Voici TON fichier passwords.json"
+            file, caption="📁 Voici tous TES mots de passe enregistrés."
         )
     else:
-        await message.answer("Tu n'as pas encore de mots de passe enregistrés.")
+        await message.answer("❗️Tu n'as pas encore enregistré de mots de passe.")
 
 
 @router.message()
 async def fallback(message: Message):
-    await message.answer("Envoyez /start pour commencer à générer un mot de passe.")
+    await message.answer(
+        "Envoyez /start pour générer un mot de passe ou /passwords pour récupérer vos mots de passe."
+    )
