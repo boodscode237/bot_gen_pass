@@ -1,3 +1,4 @@
+import os
 from aiogram import Router, types, F
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State
@@ -6,7 +7,7 @@ from aiogram.types import Message, FSInputFile
 from app.password_utils import (
     generate_robust_password,
     save_password_to_json,
-    get_passwords_json,
+    get_passwords_json_bytes,
 )
 from app.keyboards import confirm_keyboard
 
@@ -77,40 +78,24 @@ async def get_length(message: Message, state: FSMContext):
     )
     await state.set_state(Form.confirm)
 
-    # @router.callback_query(Form.confirm)
-    # async def confirm_save(call: types.CallbackQuery, state: FSMContext):
-    data = await state.get_data()
-    if call.data == "yes":
-        save_password_to_json(data["website"], data["email"], data["password"])
-        await call.message.answer("💾 Mot de passe enregistré dans passwords.json !")
-        json_bytes = get_passwords_json()
-        file = FSInputFile(path="passwords.json")
-        await call.message.answer_document(
-            file, caption="📁 Fichier passwords.json mis à jour."
-        )
-    else:
-        await call.message.answer("❌ Mot de passe non enregistré.")
-    await state.clear()
-    await call.message.answer("Pour recommencer, tapez /start.")
-
-
-from aiogram.types import FSInputFile
-
 
 @router.callback_query(Form.confirm)
 async def confirm_save(call: types.CallbackQuery, state: FSMContext):
     data = await state.get_data()
+    user_id = call.from_user.id
     if call.data == "yes":
-        save_password_to_json(data["website"], data["email"], data["password"])
-        await call.message.answer("💾 Mot de passe enregistré dans passwords.json !")
-        # Envoi du fichier passwords.json **directement à l'utilisateur**
-        user_id = call.from_user.id
-        file = FSInputFile(path="passwords.json")
+        save_password_to_json(data["website"], data["email"], data["password"], user_id)
+        await call.message.answer(
+            "💾 Mot de passe enregistré dans ton fichier personnel !"
+        )
+        # Envoi du fichier passwords_<user_id>.json à l'utilisateur
+        filename = f"passwords_{user_id}.json"
+        file = FSInputFile(path=filename)
         try:
             await call.bot.send_document(
                 chat_id=user_id,
                 document=file,
-                caption="📁 Voici ton fichier passwords.json à jour !",
+                caption="📁 Voici TON fichier passwords.json à jour !",
             )
         except Exception as e:
             await call.message.answer(f"❗️Erreur lors de l'envoi du fichier : {e}")
