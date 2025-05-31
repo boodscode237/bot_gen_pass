@@ -6,8 +6,6 @@ from app.config import PASSWORDS_FILE, DEFAULT_PASSWORD_LENGTH
 
 
 def generate_robust_password(length=DEFAULT_PASSWORD_LENGTH):
-    if length < 8:
-        pass  # On ne fait rien, mais on pourrait logguer ou avertir dans le bot
     characters = string.ascii_letters + string.digits + string.punctuation
     password_list = []
     if length >= 4:
@@ -24,26 +22,32 @@ def generate_robust_password(length=DEFAULT_PASSWORD_LENGTH):
     return "".join(password_list)
 
 
-def save_password_to_json(website, email, password):
+def get_passwords_filename(user_id):
+    return f"passwords_{user_id}.json"
+
+
+def save_password_to_json(website, email, password, user_id):
+    filename = get_passwords_filename(user_id)
     new_entry = {"website": website, "email": email, "password": password}
     data = []
-    if os.path.exists(PASSWORDS_FILE) and os.path.getsize(PASSWORDS_FILE) > 0:
+    if os.path.exists(filename) and os.path.getsize(filename) > 0:
         try:
-            with open(PASSWORDS_FILE, "r") as f:
+            with open(filename, "r") as f:
                 data = json.load(f)
         except Exception:
             data = []
     if not isinstance(data, list):
         data = []
     data.append(new_entry)
-    with open(PASSWORDS_FILE, "w") as f:
+    with open(filename, "w") as f:
         json.dump(data, f, indent=4)
     return True
 
 
-def get_passwords_json():
-    if os.path.exists(PASSWORDS_FILE):
-        with open(PASSWORDS_FILE, "rb") as f:
+def get_passwords_json_bytes(user_id):
+    filename = get_passwords_filename(user_id)
+    if os.path.exists(filename):
+        with open(filename, "rb") as f:
             return f.read()
     else:
         return b"[]"
